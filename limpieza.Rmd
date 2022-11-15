@@ -1,0 +1,527 @@
+---
+title: "Discografía Charly Garcia"
+author: "Grupo 3"
+date: '2022-10-31'
+output: 
+  html_document:
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+    self_contained: false
+---
+
+<div>
+<p style = 'text-align:center;'>
+<kbd>
+<img src="https://github.com/gforconi/maestria_ciencia_de_datos/blob/main/Analisis%20Inteligente%20de%20Datos/TP%201/img_charly.jpg?raw=true" alt="Imagen de charly" width="300px" />
+</kbd>
+</p>
+</div>
+
+------------------------------------------------------------------------
+
+<p class="text-center">MAESTRÍA EN CIENCIA DE DATOS</p>
+
+<p class="text-center">UNIVERSIDAD AUSTRAL</p>
+
+<p class="text-center">ASIGNATURA: Análisis Inteligente de Datos</p>
+
+<p class="text-center">GRUPO 3. TP1 - Limpieza y transformación de datos</p>
+
+<p class="text-center">NOVIEMBRE DE 2022</p>
+
+------------------------------------------------------------------------
+
+***Integrantes:***
+
+-   Dellarole Andres
+-   Forconi Geronimo
+-   Moreyra Carla Nazarena
+
+------------------------------------------------------------------------
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Librerias Necesarias
+
+Validamos que las librerias necesarias existan, si no existen las instalamos y cargamos.
+
+```{r instalacion, include=FALSE}
+packages <- c( "dplyr",     "stringr",    "readxl",
+               "haven",     "readr",      "knitr",
+               "kableExtra", "DT")
+newPackages <- packages[ !(packages %in% installed.packages()[, "Package"])]
+if(length(newPackages)) install.packages(newPackages)
+for (paquete in packages) {
+  suppressMessages(library(paquete, character.only = TRUE))
+}
+
+```
+
+# Configuracion Inicial
+
+1.  Borramos los objetos del area de trabajo.
+2.  Guardamos en la variable `wd_inicial` el path del working directory actual.
+3.  Creamos variables para almacenar nombre de carpetas y de archivos que luego vamos a estar utilizando.
+
+```{r seteoVariables}
+
+rm(list = ls()) # Clean object
+
+
+wd_inicial <- "../"
+
+carpeta_descarga <- "./download"
+archivo_descarga <- "download.zip"
+archivo_entrega <- "resultado.txt"
+
+# url del archivo .zip que contiene la informacion
+url_zip <- "https://github.com/gforconi/maestria_ciencia_de_datos/blob/main/Analisis%20Inteligente%20de%20Datos/TP%201/datos_charly2.zip?raw=true"
+```
+
+# Descargamos y Descomprimimos
+
+1. Descargamos y descomprimimos el archivo **datos_charly.zip** en carpeta download.
+2. Borramos variables que no necesitamos.
+3. Seteamos working directory a la carpeta **download**
+
+```{r descargoZIP}
+
+#Generamos path
+temp <- paste(getwd(),archivo_descarga, sep = "/")
+#Descargamos archivo
+download.file(url_zip,temp, mode='wb')
+#Descomprimimos
+unzip(zipfile = archivo_descarga, unzip = "internal", exdir = carpeta_descarga) 
+
+# Borramos objetos que no vamos a necesitar
+rm(url_zip, temp)
+
+# Seteamos WD
+knitr::opts_knit$set(root.dir = carpeta_descarga)
+
+```
+
+# Carga de archivos
+
+Cargo los archivos que aparecen en la primera carpeta.
+1. Cargo archivos con distintos tipos de separadores, distintas extensiones y distintas estructuras.
+2. Cargo archivos de forma recursiva, unificando en un solo data frame.
+
+## 1. Un archivo a un data frame
+
+
+### Archivo .SAS7DBAT
+
+Cargamos archivo con extensión .sas7bdat
+
+```{r archivosSAS7DBAT}
+
+df_bbatj <- read_sas("bbatj.sas7bdat", NULL)
+
+datatable(data = df_bbatj, filter = "top", options = list(scrollX = TRUE))
+```
+
+*Observaciones:* No se observan errores en el data frame cargado
+
+### Archivos .xlsx
+
+Cargamos archivos con extensión .xlsx
+
+```{r archivosXLSX}
+
+df_albums <- read_excel("albums.xlsx")
+
+datatable(data = df_albums, filter = "top", options = list(scrollX = TRUE))
+```
+
+```{r archivosXLSX2}
+
+df_serugiran <- read_excel("serugiran.xlsx")
+
+datatable(data = df_serugiran, filter = "top", options = list(scrollX = TRUE))
+```
+
+*Observaciones:*
+1. Las columnas `acusticidad` tiene notacion cientifica.
+2. Las columnas no tienen el mismo nombre que los otros data frame, por eso cambiamos los nombres respetando las posiciones.
+
+```{r archivosXLSX_Correcciones}
+
+#Cambiamos formato de las columnas de cientifico a numeric
+df_serugiran$acusticidad <- as.numeric(format(df_serugiran$acusticidad, scientific = FALSE))
+
+#df_serugiran cambiar nombre de las columnas
+colnames(df_serugiran) <- colnames(df_bbatj)
+
+datatable(data = df_serugiran, filter = "top", options = list(scrollX = TRUE))
+```
+
+
+### Archivo .CSV
+
+Cargamos archivo con extensión .csv
+
+```{r archivosCSV}
+
+df_suigeneris <- read_delim(file = "suigeneris.csv",
+                            delim = ",", 
+                            show_col_types = FALSE) 
+
+datatable(data = df_suigeneris, filter = "top", options = list(scrollX = TRUE))
+```
+
+*Observaciones:* 
+
+1. Las columnas `album_id` y `album_name` tienen informacion para el `track_numer == 1` unicamente, hay que replicar esos datos para el restro de las filas. La correccion seria replicar el `album_id` y `album_name` para los `track_numer` distinto de 1.
+
+```{r archivosCSV_correcciones_1}
+
+for (line in 1:nrow(df_suigeneris)){
+  
+  if(df_suigeneris[line,2] == 1){
+    id <- df_suigeneris[line,3] #album_id
+    name <- df_suigeneris[line,4] #line$album_name
+  }else {
+    df_suigeneris[line,3] <- id
+    df_suigeneris[line,4] <- name
+  }
+}
+
+datatable(data = df_suigeneris, filter = "top", options = list(scrollX = TRUE))
+```
+
+
+2. Por otro lado no existe la columna `disc_number`. Para completar este campo fuimos a spotify con el siguiente codigo: 
+
+```{r eval=FALSE, echo = TRUE}
+library(devtools)
+install_github("tiagomendesdantas/Rspotify", force = TRUE)
+library(Rspotify)
+library(dplyr)
+keys <- spotifyOAuth("031ae484190847cf8267f775248ae42f",
+                     "031ae484190847cf8267f775248ae42f",
+                     "2df61022fa0b48ad83f4c1921133d155")
+
+my_oauth <- spotifyOAuth(app_id="031ae484190847cf8267f775248ae42f",
+                         client_id="031ae484190847cf8267f775248ae42f",
+                         client_secret="2df61022fa0b48ad83f4c1921133d155")
+#lectura2 <- as.data.frame(getAlbum("5XBgXYEw2flQFZDW1I8lFS",token=keys))
+lista <- df_suigeneris[!is.na(df_suigeneris$album_id),]$album_id
+
+primer_paso <- TRUE
+for (album_id in lista) {
+  lectura <- getAlbum(album_id,token=keys)[,c("id", "track_number", "disc_number")]
+  lectura["album_id"]<-album_id
+  if (primer_paso) {
+    df <- lectura
+    primer_paso <- FALSE
+  } else {
+    df <- union_all(df,lectura)
+  }
+  print(paste("procesando:", album_id))
+}
+#Buscamos todos los que tengan dis_number mayor a uno
+distinct(df[df$disc_number>1,][,c("album_id", "disc_number")])
+#Conclusion, el unico album_id a actualizar es 7hnjaxu9GjMBJCQd9F5xvn con disc_number = 2
+```
+
+Pegamos el codigo utilizado, pero no lo integramos al todo el documento, es decir, no se ejecuta. Lo ponemos para que si alguien lo quiere ejecutar y tiene cuenta de spotify lo pueda probar. Para todos los albunes ponemos `disc_number = 1` menos para el album `7hnjaxu9GjMBJCQd9F5xvn` que le corresponde `disc_number = 2`.
+
+```{r archivosCSV_correcciones_2}
+
+df_suigeneris["disc_number"] <- 1
+df_suigeneris$disc_number[df_suigeneris$album_id == "7hnjaxu9GjMBJCQd9F5xvn"] <- 2
+
+datatable(data = df_suigeneris, filter = "top", options = list(scrollX = TRUE))
+
+```
+
+### Archivo .TXT
+
+Cargamos archivo con extensión .txt
+
+```{r archivosTXT}
+
+df_porsuigieco <- read_delim(
+  file = "porsuigieco.txt",
+  delim = "|",
+  show_col_types = FALSE
+) 
+
+datatable(data = df_porsuigieco, filter = "top", options = list(scrollX = TRUE))
+```
+
+## 2. Varios archivos a un data frame
+Para esto generamos dos funciones una para los archivos solista y otros para La Máquina de Hacer Pájaros.
+
+### Generacion de funciones
+Funcion `proceso_solista` : 
+
+La funcion recibe una lista de archivos, los lee y unifica en un data frame.
+
+El primer archivo genera el modelo del data frame luego va incorporando informacion al mismo data frame.
+
+```{r proceso_solista}
+
+proceso_solista <- function(archivos)
+{
+  primer_paso <- TRUE
+  for (file in archivos) {
+    
+    lectura <- read_delim(
+      file = file,
+      delim = "\t",
+      show_col_types = FALSE #Silencia mensaje de consola
+    )
+    if (primer_paso) {
+      df <- lectura
+      primer_paso <- FALSE
+    } else {
+      df <- union_all(df,lectura)
+    }
+    #print(paste("procesando:", file)) #Muestra el archivo que vamos procesando
+  }
+  return(df)
+}
+```
+
+Funcion `proceso_maquina_pajaros` : 
+
+La funcion recibe una data frame como parametro, este data frame tiene tres columnas, la primera los nombre de los archivos, la segunda el nombre del arlbum, la tercera el ID del album, la cuarta el artista.
+
+Utilizamos este data frame porque en los archivos no se encontraban estos datos, entonces a medida que voy recorriendo los archivos voy poniendo el nombre del album y el ID.
+
+Por la disposicion de los datos en el archivo cuando se realiza el `read_delim` los campos se cargan en dos columnas y los valores son todos reconocidos como `chr` (como texto). Entonces, primero es tabular la tabla para que cada tupla (variable-valor) pasen a ser dos fila una con las variables y otra con los valores. De esta forma hacemos que las variables esten en columnas como el resto de los data frame y podamos unificar la información.
+
+Al igual que la funcion anterior, el primer archivo genera el modelo del data frame. El resto se va incorporando.
+
+Por ultimo antes de devolver el data frame reacomodamos las columnas y convertimos a `numeric` las columnas que son numericas.
+
+```{r proceso_maquina_pajaros}
+proceso_maquina_pajaros <- function(df_parametros)
+{
+  primer_paso <- TRUE
+  for (df_row in 1:nrow(df_parametros)) {
+    lectura <- readr::read_delim(
+      file = df_parametros[df_row,1],
+      col_names = FALSE,
+      delim = ":",
+      trim_ws = TRUE, #Quita espacios en blancos en inicio y fin.
+      show_col_types = FALSE #Silencia mensaje de consola
+    )
+    
+    lectura_t <- data.frame(t(lectura)) #Trasnponemos y conviertimos en Data Frame
+    colnames(lectura_t) <- lectura_t[1,] #Llevamos primera fila a nombre de columnas
+    lectura_t <- lectura_t[- 1, ] #Borramos primera fila con nombre de columnas
+    
+    #Agregamos nombre del album e id
+    
+    lectura_t["album_name"] <- df_parametros[df_row,2]
+    lectura_t["album_id"] <- df_parametros[df_row,3]
+    lectura_t["album_artist"] <- df_parametros[df_row,3]
+    
+    lectura_t["uri"] <- paste("spotify:track:", lectura_t["id"], sep = "")
+    lectura_t["analysis_url"] <- paste("https://api.spotify.com/v1/audio-analysis/", lectura_t["id"], sep = "")
+    
+    if (primer_paso) {
+      df <- lectura_t
+      primer_paso <- FALSE
+    } else {
+      df <- union_all(df,lectura_t)
+    }
+    # print(paste("procesando:", df_parametros[df_row,1])) #Muestra el archivo que vamos procesando
+  }
+  
+  df <- select(df, name, id, album_name, album_id, album_artist, uri, analysis_url, everything())
+  df[,8:ncol(df)] <- sapply(df[,8:ncol(df)], as.numeric) #Tranformamos a numeric las columnas
+  
+  return(df)
+}
+```
+
+### Recursividad para temas solista
+
+Buscamos todos los archivos que estan en la carpeta **solista** y llamamos a la funcion `proceso_solista` pasando como parametro la lista de los full path (path+nombre+extension) de los archivos.
+
+```{r recursividadSolista}
+path = "./solista"
+archivos <- list.files(path = path, recursive = T, include.dirs=TRUE)
+archivos <- paste(path,archivos[], sep = "/")
+df_solista <- proceso_solista(archivos)
+
+datatable(data = df_solista, filter = "top", options = list(scrollX = TRUE))
+```
+
+*Observaciones:* No se observan errores en el data frame cargado
+
+### Recursividad para temas LMDHP
+
+1. Buscamos todos los archivos dentro de la carpeta **lmdhp** .
+2. Convertimos la lista de archivos en data frame
+3. Agregamos al data frame tres columnas (`album_name,id, artist`) que estan en el data frame albums. En el path tenemos el nombre del album, para obtenerlo usamos un `mutate` y las funciones `str_split` para dividir el path, `str_replace_all` para reemplazar texto dentro del string y `str_to_title` para poner la primera letra en mayuscula. Con estas funciones obtenemos el nombre del album luego con un `left_join` buscamos el album en el data frame albums. Y al final nos quedamos con las columnas que queres mediante el `select`
+4. Llamamos a la funcion `proceso_maquina_pajaros` con el data frame que armamos en el paso anterior.
+
+```{r recursividadLMDHP}
+# Cargo archivos lmdhp ----
+
+path = "./lmdhp"
+archivos <- list.files(path = path, recursive = T)
+
+archivos <- data.frame(archivos)
+
+df_parametros <- archivos %>% 
+  mutate(col1 = str_split(#Buscamos el caracter / para dividir el path y nos quedamos con el primer corte
+    string = archivos,
+    pattern = "/",
+    simplify = TRUE,
+    #n = 2
+  )[,1]
+  ,
+  col2 = str_split( #Buscamos el string "album_" para dividir el path y nos quedamos con el primer segundo corte. Otra forma de hacer esto es un reemplace de "album_" por un vacio "".
+    string = col1,
+    pattern = "album_",
+    simplify = TRUE
+  )[,2],
+  col3 = str_replace_all( #Reemplazamos _ por espacios
+    string = col2,    
+    pattern = "_",     
+    replacement = " "   
+  ),
+  col4 = str_replace_all( #Reemplazamos pajaros por pájaros para que coincidan los string.
+    string = col3,
+    pattern = "pajaros",
+    replacement = "pájaros"
+  ),
+  col5 = str_replace_all(#Reemplazamos maquina por máquina para que coincidan los string.
+    string = col4,
+    pattern = "maquina",
+    replacement = "máquina"
+  ),
+  album_name = str_to_title(col5), #Convertimos primera letra y letras despues de los espacios en mayusculas
+  fullPath = paste(path,archivos, sep = "/")) %>% #Agregamos al path la carpeta donde estamos buscando
+  left_join(df_albums, by = c("album_name" = "name")) %>% 
+  select(fullPath,album_name,id, artist)
+
+```
+
+Parametros que enviamos a la funcion `proceso_maquina_pajaros`:
+
+```{r recursividadLMDHP_2}
+datatable(data = df_parametros, filter = "top", options = list(scrollX = TRUE))
+```
+
+Resultado de la ejecucion de la funcion:
+
+```{r recursividadLMDHP_3}
+df_lmdhp <- proceso_maquina_pajaros(df_parametros)
+datatable(data = df_lmdhp, filter = "top", options = list(scrollX = TRUE))
+```
+
+*Observaciones:* No existe la columna `disc_number`. Al ser dos albunes de 7 y 8 temas cada uno ponemos la columna `disc_number` en uno para todos.
+
+```{r recursividadLMDHP_4}
+
+df_lmdhp["disc_number"] <- 1
+
+datatable(data = df_lmdhp, filter = "top", options = list(scrollX = TRUE))
+
+```
+
+### Limpieza de objetos
+
+Borramos las carpetas donde se realizaron las descargas. Hasta este punto ya cargamos todos los archivos, solo nos resta unificar, corregir errores y guardar la salida en un .TXT.
+```{r}
+knitr::opts_knit$set(root.dir = "./")
+```
+
+```{r }
+#print(getwd())
+```
+
+```{r recursividadLimpieza}
+
+knitr::opts_knit$set(root.dir = "./")
+unlink("./download", recursive = TRUE)
+unlink("./download.zip", recursive = TRUE)
+```
+
+# Unificamos en un solo Data Frame
+
+## Primer union_all
+
+Para unificar los data frame utilizamos `union_all` primero lo hacemos con los data frame que estan sin errores o ya manipulados.
+
+```{r union_all}
+
+df_union <- union_all(df_solista,df_lmdhp)
+df_union <- union_all(df_union,df_porsuigieco)
+df_union <- union_all(df_union,df_bbatj)
+df_union <- union_all(df_union,df_serugiran)
+df_union <- union_all(df_union,df_suigeneris)
+
+datatable(data = df_union, filter = "top", options = list(scrollX = TRUE))
+```
+
+
+# Correciones para el data frame unificado
+
+##  album_artist
+
+Actualizamos el album_artist para todos para todo el data frame.
+
+```{r correciones_album_artist}
+
+df_aux <- left_join(df_union[ , c("album_id")], 
+                             df_albums[ , c("id", "artist")], 
+                             by = c("album_id" = "id"),
+                             all.output=TRUE
+                             )%>% select(artist)
+
+df_union$album_artist <-  df_aux$artist
+
+rm(df_aux)
+datatable(data = df_union, filter = "top", options = list(scrollX = TRUE))
+```
+
+## instrumentalness
+En todos los archivos se levanto como un numero con notacion cientifica, lo llevamos a numero.
+```{r correciones_instrumentalness}
+
+df_union$instrumentalness <- as.numeric(format(df_union$instrumentalness, scientific = FALSE))
+
+datatable(data = df_union, filter = "top", options = list(scrollX = TRUE))
+```
+
+## Seteado de indices
+
+Esta linea no es necesaria ya que cuando exportamos el data frame a TXT ponemos configuramos el parametro `row.names = FALSE` es decir que no es lleve el indice de fila. La agregamos para poder ver mas lindo el data frame en las pruebas.
+
+```{r seteo_index}
+rownames(df_union) <- NULL #reseteo los indices de fila
+```
+
+# Generamos la salida a TXT
+
+Exportamos al data frame unificado a TXT con separacion de tabular como lo solicitaba el enunciado. 
+
+```{r export}
+
+write.table(df_union, 
+            file = archivo_entrega, 
+            sep = "\t",
+            dec = ".",
+            row.names = FALSE, 
+            col.names = TRUE,
+            quote = FALSE)
+```
+
+
+```{r export}
+#prueba
+max(df_union$instrumentalness)
+min(df_union$instrumentalness)
+```
+
